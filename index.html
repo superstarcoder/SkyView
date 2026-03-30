@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SKYVIEW</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --panel: rgba(4,8,22,0.88);
+    --border: rgba(100,160,255,0.15);
+    --accent: #5bf;
+    --accent2: #fb6;
+    --text: #c0d4f8;
+    --dim: rgba(192,212,248,0.4);
+  }
+  html, body { width:100%; height:100%; overflow:hidden; background:#000; font-family:'Space Mono',monospace; color:var(--text); user-select:none; }
+  #c { display:block; width:100%; height:100%; cursor:grab; }
+  #c.dragging { cursor:grabbing; }
+  #hud { position:fixed; inset:0; pointer-events:none; z-index:10; }
+
+  #topbar {
+    position:absolute; top:14px; left:50%; transform:translateX(-50%);
+    display:flex; align-items:center; gap:20px;
+    background:var(--panel); border:1px solid var(--border);
+    border-radius:4px; padding:7px 20px; backdrop-filter:blur(16px);
+    pointer-events:auto; white-space:nowrap;
+  }
+  .logo { font-family:'Bebas Neue'; font-size:19px; letter-spacing:5px; color:#fff; }
+  .vd { width:1px; height:20px; background:var(--border); }
+  .ib { font-size:9.5px; color:var(--dim); line-height:1.75; }
+  .ib b { color:var(--text); font-weight:400; }
+  .ib .hi { color:var(--accent); }
+
+  .panel {
+    position:absolute; background:var(--panel); border:1px solid var(--border);
+    border-radius:4px; padding:13px; backdrop-filter:blur(16px);
+    pointer-events:auto; display:flex; flex-direction:column; gap:9px;
+  }
+  #lp { top:66px; left:14px; width:226px; }
+  #rp { top:66px; right:14px; width:204px; }
+  .pt { font-family:'Bebas Neue'; font-size:11px; letter-spacing:3px; color:var(--accent); border-bottom:1px solid var(--border); padding-bottom:6px; }
+  .cr { display:flex; flex-direction:column; gap:3px; }
+  .cl { font-size:8px; letter-spacing:1.5px; color:var(--dim); text-transform:uppercase; }
+  .cv { font-size:11px; }
+  input[type=range] { -webkit-appearance:none; width:100%; height:2px; background:rgba(100,160,255,0.2); border-radius:1px; outline:none; cursor:pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:10px; height:10px; border-radius:50%; background:var(--accent); cursor:pointer; }
+  input[type=range].o::-webkit-slider-thumb { background:var(--accent2); }
+  .br { display:flex; gap:5px; }
+  button {
+    flex:1; padding:5px 2px; background:rgba(85,187,255,0.06);
+    border:1px solid var(--border); border-radius:3px; color:var(--text);
+    font-family:'Space Mono'; font-size:8px; letter-spacing:1px; cursor:pointer;
+    text-transform:uppercase; transition:background .1s,border-color .1s;
+  }
+  button:hover { background:rgba(85,187,255,0.16); border-color:var(--accent); }
+  button.on { background:rgba(85,187,255,0.2); border-color:var(--accent); color:var(--accent); }
+  .spd { font-family:'Bebas Neue'; font-size:28px; color:var(--accent2); letter-spacing:2px; line-height:1; }
+  .spdu { font-size:8px; color:var(--dim); }
+
+  #botbar {
+    position:absolute; bottom:14px; left:50%; transform:translateX(-50%);
+    display:flex; align-items:center; gap:16px;
+    background:var(--panel); border:1px solid var(--border); border-radius:4px;
+    padding:6px 16px; backdrop-filter:blur(16px); pointer-events:auto; white-space:nowrap;
+  }
+  .hint { font-size:8.5px; color:var(--dim); letter-spacing:.5px; }
+  .hint b { color:var(--text); }
+
+  #tip {
+    position:fixed; background:var(--panel); border:1px solid var(--border);
+    border-radius:3px; padding:5px 9px; font-size:9.5px; pointer-events:none;
+    display:none; z-index:30; backdrop-filter:blur(8px);
+  }
+  #tip .tn { color:#fff; font-weight:700; font-size:11px; }
+  #tip .ti { color:var(--dim); margin-top:1px; line-height:1.5; }
+
+  #loading {
+    position:fixed; inset:0; background:#000; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; z-index:100; gap:12px; transition:opacity .7s;
+  }
+  #loading .lb { font-family:'Bebas Neue'; font-size:52px; letter-spacing:12px; color:#fff; }
+  #loading .ls { font-size:9px; color:var(--dim); letter-spacing:3px; animation:blink 1s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:1}50%{opacity:.2} }
+
+  #travelbadge {
+    position:absolute; top:14px; right:14px; display:none; align-items:center; gap:6px;
+    background:rgba(255,187,68,0.1); border:1px solid rgba(255,187,68,0.3);
+    border-radius:4px; padding:6px 11px; pointer-events:none;
+    font-size:8.5px; color:var(--accent2); letter-spacing:1px;
+  }
+  #travelbadge.on { display:flex; }
+  .td { width:6px; height:6px; border-radius:50%; background:var(--accent2); animation:pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.6)} }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div id="topbar">
+    <div class="logo">SKYVIEW</div>
+    <div class="vd"></div>
+    <div class="ib">DATE <b id="dv">—</b><br>TIME <b id="tv">—</b> UTC</div>
+    <div class="vd"></div>
+    <div class="ib">LAT <span class="hi" id="latv">—</span><br>LON <span class="hi" id="lonv">—</span></div>
+    <div class="vd"></div>
+    <div class="ib">PITCH <b id="pitchv">—</b><br>YAW <b id="yawv">—</b></div>
+  </div>
+
+  <div id="travelbadge"><div class="td"></div><span id="tblabel">TRAVELING</span></div>
+
+  <div class="panel" id="lp">
+    <div class="pt">Location &amp; Travel</div>
+    <div class="cr">
+      <div class="cl">Latitude</div>
+      <input type="range" id="slat" min="-89.9" max="89.9" step="0.5" value="40.7">
+      <div class="cv" id="rlat">40.7° N</div>
+    </div>
+    <div class="cr">
+      <div class="cl">Longitude</div>
+      <input type="range" id="slon" min="-180" max="180" step="0.5" value="-74">
+      <div class="cv" id="rlon">74.0° W</div>
+    </div>
+    <div class="cr">
+      <div class="cl">Travel Speed (km/s)</div>
+      <input type="range" class="o" id="sspd" min="0" max="200" step="1" value="0">
+      <div class="cv" id="rspd">Stationary</div>
+    </div>
+    <div class="cr">
+      <div class="cl">Direction</div>
+      <div class="br">
+        <button id="dN" onclick="setDir('N')">↑ N</button>
+        <button id="dE" onclick="setDir('E')">→ E</button>
+        <button id="dS" onclick="setDir('S')">↓ S</button>
+        <button id="dW" onclick="setDir('W')">← W</button>
+      </div>
+    </div>
+    <div class="cr">
+      <div class="cl">Presets</div>
+      <div class="br">
+        <button onclick="goTo(40.7,-74)">New York</button>
+        <button onclick="goTo(35.7,139.7)">Tokyo</button>
+      </div>
+      <div class="br">
+        <button onclick="goTo(-33.9,151.2)">Sydney</button>
+        <button onclick="goTo(64.1,-21.9)">Reykjavik</button>
+      </div>
+      <div class="br">
+        <button onclick="goTo(0,0)">Equator</button>
+        <button onclick="goTo(89.9,0)">N. Pole</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="rp">
+    <div class="pt">Time Control</div>
+    <div class="cr">
+      <div class="cl">Simulation Speed</div>
+      <input type="range" class="o" id="stspd" min="0" max="11" step="1" value="0">
+      <div class="spd" id="rspeedlbl">1×</div>
+      <div class="spdu" id="rspeedunit">REAL TIME</div>
+    </div>
+    <div class="br">
+      <button onclick="setTS(0)" id="ts0">1×</button>
+      <button onclick="setTS(3)" id="ts3">60×</button>
+      <button onclick="setTS(7)" id="ts7">1hr/s</button>
+      <button onclick="setTS(10)" id="ts10">1day/s</button>
+    </div>
+    <div class="br">
+      <button onclick="togglePause()" id="pausebtn">⏸ Pause</button>
+      <button onclick="resetTime()">↺ Now</button>
+    </div>
+    <div class="cr" style="margin-top:3px">
+      <div class="cl">Display</div>
+      <div class="br">
+        <button onclick="tog('mw')" id="bmw" class="on">Milky Way</button>
+        <button onclick="tog('lbl')" id="blbl" class="on">Labels</button>
+      </div>
+      <div class="br">
+        <button onclick="tog('grid')" id="bgrid">Alt/Az Grid</button>
+        <button onclick="tog('atm')" id="batm" class="on">Atmosphere</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="botbar">
+    <div class="hint"><b>DRAG</b> to look around</div>
+    <div class="vd"></div>
+    <div class="hint"><b>SCROLL</b> to zoom (FOV)</div>
+    <div class="vd"></div>
+    <div class="hint"><b>LOOK DOWN</b> for ground</div>
+    <div class="vd"></div>
+    <div class="hint" id="viscnt">— stars</div>
+  </div>
+</div>
+
+<div id="tip"><div class="tn" id="tipname"></div><div class="ti" id="tipinfo"></div></div>
+<div id="loading"><div class="lb">SKYVIEW</div><div class="ls">CALIBRATING STAR POSITIONS…</div></div>
+
+<script>
+// ════════════════════════════════════════════════
+// MATH
+// ════════════════════════════════════════════════
+const D2R = Math.PI/180, R2D = 180/Math.PI;
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+
+function jd(d) { return d.getTime()/86400000 + 2440587.5; }
+
+function gmst(d) {
+  const j = jd(d), T = (j-2451545)/36525;
+  return (((280.46061837 + 360.98564736629*(j-2451545) + 0.000387933*T*T - T*T*T/38710000) % 360) + 360) % 360;
+}
+
+// RA/Dec (degrees) + observer lat/lon + date → unit vector in local ENU frame
+// returns {x: East, y: North, z: Up}
+function raDecToENU(ra, dec, lat, lon, date) {
+  const lst = ((gmst(date) + lon) % 360 + 360) % 360;
+  const ha  = ((lst - ra) % 360 + 360) % 360;
+  const haR = ha*D2R, dR = dec*D2R, lR = lat*D2R;
+
+  // Horizontal coords
+  const sinA = Math.sin(dR)*Math.sin(lR) + Math.cos(dR)*Math.cos(lR)*Math.cos(haR);
+  const alt   = Math.asin(clamp(sinA,-1,1));
+  const cosAz = (Math.sin(dR) - sinA*Math.sin(lR)) / (Math.cos(alt)*Math.cos(lR));
+  const az0   = Math.acos(clamp(cosAz,-1,1));
+  const az    = (Math.sin(haR) > 0) ? (2*Math.PI - az0) : az0;
+
+  // Convert Alt/Az to ENU
+  const cosAlt = Math.cos(alt);
+  return {
+    x:  cosAlt * Math.sin(az),   // East
+    y:  cosAlt * Math.cos(az),   // North
+    z:  Math.sin(alt),           // Up
+    altDeg: alt*R2D,
+    azDeg:  az*R2D
+  };
+}
+
+// ════════════════════════════════════════════════
+// SOLAR SYSTEM — accurate low-precision positions
+// Based on Jean Meeus "Astronomical Algorithms"
+// and Paul Schlyter's planetary formulae
+// ════════════════════════════════════════════════
+
+function norm360(x) { return ((x % 360) + 360) % 360; }
+function norm2pi(x) { return ((x % (2*Math.PI)) + 2*Math.PI) % (2*Math.PI); }
+
+// Solve Kepler's equation E = M + e*sin(E) iteratively
+function solveKepler(M, e) {
+  let E = M;
+  for (let i = 0; i < 10; i++) E = M + e * Math.sin(E);
+  return E;
+}
+
+// Get Julian centuries since J2000.0
+function T2000(date) { return (jd(date) - 2451545.0) / 36525.0; }
+
+// ── MOON (Meeus Ch.47 low-precision) ──────────────
+// Returns { ra, dec } in degrees, plus phase 0-1
+function moonPosition(date) {
+  const T = T2000(date);
+  const D2Ri = D2R;
+
+  // Fundamental arguments (degrees)
+  const Lm  = norm360(218.3164477 + 481267.88123421*T);  // Moon mean longitude
+  const M   = norm360(357.5291092 +  35999.0502909*T);   // Sun mean anomaly
+  const Mm  = norm360(134.9633964 + 477198.8675055*T);   // Moon mean anomaly
+  const F   = norm360( 93.2720950 + 483202.0175233*T);   // Moon arg of latitude
+  const D   = norm360(297.8501921 + 445267.1114034*T);   // Moon elongation
+
+  // Longitude perturbations (degrees)
+  let dL = 6288774*Math.sin(Mm*D2Ri)
+          + 1274027*Math.sin((2*D-Mm)*D2Ri)
+          +  658314*Math.sin(2*D*D2Ri)
+          +  213618*Math.sin(2*Mm*D2Ri)
+          -  185116*Math.sin(M*D2Ri)
+          -  114332*Math.sin(2*F*D2Ri)
+          +   58793*Math.sin((2*D-2*Mm)*D2Ri)
+          +   57066*Math.sin((2*D-M-Mm)*D2Ri)
+          +   53322*Math.sin((2*D+Mm)*D2Ri)
+          +   45758*Math.sin((2*D-M)*D2Ri)
+          -   40923*Math.sin((M-Mm)*D2Ri)
+          -   34720*Math.sin(D*D2Ri)
+          -   30383*Math.sin((M+Mm)*D2Ri);
+  dL /= 1000000;
+
+  // Latitude perturbations
+  let dB = 5128122*Math.sin(F*D2Ri)
+          +  280602*Math.sin((Mm+F)*D2Ri)
+          +  277693*Math.sin((Mm-F)*D2Ri)
+          +  173237*Math.sin((2*D-F)*D2Ri)
+          +   55413*Math.sin((2*D-Mm+F)*D2Ri)
+          +   46271*Math.sin((2*D-Mm-F)*D2Ri)
+          +   32573*Math.sin((2*D+F)*D2Ri)
+          +   17198*Math.sin((2*Mm+F)*D2Ri);
+  dB /= 1000000;
+
+  const lambda = norm360(Lm + dL);  // ecliptic longitude
+  const beta   = dB;                 // ecliptic latitude
+
+  // Convert ecliptic → equatorial
+  const eps = 23.439291111 - 0.013004167*T;  // obliquity
+  const eR = eps*D2Ri, lR = lambda*D2Ri, bR = beta*D2Ri;
+  const sinDec = Math.sin(bR)*Math.cos(eR) + Math.cos(bR)*Math.sin(eR)*Math.sin(lR);
+  const dec = Math.asin(clamp(sinDec,-1,1))*R2D;
+  const ra  = norm360(Math.atan2(
+    Math.sin(lR)*Math.cos(eR) - Math.tan(bR)*Math.sin(eR),
+    Math.cos(lR)
+  )*R2D);
+
+  // Phase angle (0=new, 0.5=full, 1=new again)
+  const phase = norm360(lambda - norm360(280.4665 + 36000.7698*T)) / 360;
+
+  return { ra, dec, phase, name:'Moon' };
+}
+
+// ── PLANETS (Schlyter / Meeus orbital elements) ──
+// Each planet: [N0,Nd, i0,id, w0,wd, a, e0,ed, M0,Md, name, color, mag_base]
+// N=longitude of ascending node, i=inclination, w=arg of perihelion
+// a=semi-major axis (AU), e=eccentricity, M=mean anomaly
+// All rates per Julian century
+const PLANET_ELEMS = [
+  // Mercury
+  { N0:48.3313,   Nd: 3.24587,   i0:7.0047,   id:5e-5,
+    w0:29.1241,   wd:1.01444,    a:0.387098,  e0:0.205635,  ed:5.59e-10,
+    M0:168.6562,  Md:4.0923344368*36525, col:'#b5b5b5', name:'Mercury', magB:-0.4 },
+  // Venus
+  { N0:76.6799,   Nd: 2.46590,   i0:3.3946,   id:2.75e-4,
+    w0:54.8910,   wd:1.38374,    a:0.723330,  e0:0.006773,  ed:-1.302e-9,
+    M0:48.0052,   Md:1.6021302244*36525, col:'#fffacd', name:'Venus',   magB:-4.4 },
+  // Mars
+  { N0:49.5574,   Nd: 2.11081,   i0:1.8497,   id:-1.78e-4,
+    w0:286.5016,  wd:2.92961,    a:1.523688,  e0:0.093405,  ed:2.516e-9,
+    M0:18.6021,   Md:0.5240207766*36525, col:'#e8714a', name:'Mars',    magB:-1.5 },
+  // Jupiter
+  { N0:100.4542,  Nd: 2.76854,   i0:1.3030,   id:-1.557e-4,
+    w0:273.8777,  wd:1.64505,    a:5.20256,   e0:0.048498,  ed:4.469e-9,
+    M0:19.8950,   Md:0.0830853001*36525, col:'#c8a96e', name:'Jupiter', magB:-9.4 },
+  // Saturn
+  { N0:113.6634,  Nd: 2.38980,   i0:2.4886,   id:-1.081e-4,
+    w0:339.3939,  wd:2.97661,    a:9.55475,   e0:0.055546,  ed:-9.499e-9,
+    M0:316.9670,  Md:0.0334442282*36525, col:'#e8d5a0', name:'Saturn',  magB:-8.9 },
+  // Uranus
+  { N0:74.0005,   Nd: 1.3978,    i0:0.7733,   id:1.9e-4,
+    w0:96.6612,   wd:3.0565,     a:19.18171,  e0:0.047318,  ed:7.45e-9,
+    M0:142.5905,  Md:0.011725806*36525, col:'#7de8e8', name:'Uranus',   magB:-7.2 },
+];
+
+function planetPosition(p, date) {
+  const T  = T2000(date);
+  const d  = jd(date) - 2451545.0;  // days since J2000
+
+  const N  = norm360(p.N0 + p.Nd * T) * D2R;
+  const i  = (p.i0 + p.id * T) * D2R;
+  const w  = norm360(p.w0 + p.wd * T) * D2R;
+  const e  = p.e0 + p.ed * d;
+  const M  = norm360(p.M0 + p.Md / 36525 * T) * D2R;
+
+  const E  = solveKepler(M, e);
+  const xv = p.a * (Math.cos(E) - e);
+  const yv = p.a * Math.sqrt(1-e*e) * Math.sin(E);
+  const v  = Math.atan2(yv, xv);
+  const r  = Math.sqrt(xv*xv + yv*yv);
+
+  // Heliocentric ecliptic position
+  const xh = r*(Math.cos(N)*Math.cos(v+w) - Math.sin(N)*Math.sin(v+w)*Math.cos(i));
+  const yh = r*(Math.sin(N)*Math.cos(v+w) + Math.cos(N)*Math.sin(v+w)*Math.cos(i));
+  const zh = r*(Math.sin(v+w)*Math.sin(i));
+
+  // Sun's position (Earth's heliocentric coords negated)
+  const Ms = norm360(357.5291092 + 0.98560028*d) * D2R;
+  const Es = solveKepler(Ms, 0.016709);
+  const xs = Math.cos(Es) - 0.016709;
+  const ys = Math.sqrt(1-0.016709*0.016709)*Math.sin(Es);
+  const sunDist = Math.sqrt(xs*xs+ys*ys);
+  const sunLon = Math.atan2(ys,xs);
+  const xsE = sunDist*Math.cos(sunLon);  // Earth in heliocentric ecliptic
+  const ysE = sunDist*Math.sin(sunLon);
+
+  // Geocentric ecliptic
+  const xg = xh - xsE;
+  const yg = yh - ysE;
+  const zg = zh;
+
+  // Equatorial coords
+  const eps = (23.439291111 - 0.013004167*T) * D2R;
+  const xe  = xg;
+  const ye  = yg*Math.cos(eps) - zg*Math.sin(eps);
+  const ze  = yg*Math.sin(eps) + zg*Math.cos(eps);
+
+  const ra  = norm360(Math.atan2(ye,xe)*R2D);
+  const dec = Math.asin(clamp(ze/Math.sqrt(xe*xe+ye*ye+ze*ze),-1,1))*R2D;
+
+  return { ra, dec, name:p.name, col:p.col, magB:p.magB };
+}
+
+// Draw the Moon with phase shading
+function drawMoon(sx, sy, phase) {
+  const r = Math.max(7, H/90);
+  // Full bright disk
+  ctx.beginPath();
+  ctx.arc(sx, sy, r, 0, Math.PI*2);
+  ctx.fillStyle = '#f0ead8';
+  ctx.fill();
+
+  // Shadow to show phase
+  // phase: 0=new, 0.25=first quarter, 0.5=full, 0.75=last quarter
+  const angle = phase * 2 * Math.PI;
+  // The illuminated fraction and which side
+  // We draw the dark side as an overlay
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(sx, sy, r, 0, Math.PI*2);
+  ctx.clip();
+
+  // Dark half
+  const termPhase = phase * 2 * Math.PI;
+  ctx.fillStyle = 'rgba(5,8,20,0.92)';
+
+  if (phase < 0.5) {
+    // Waxing: dark on left half + ellipse on right
+    ctx.beginPath();
+    ctx.arc(sx, sy, r, Math.PI/2, -Math.PI/2, true); // left half
+    ctx.fill();
+    // Terminator ellipse
+    const ex = Math.cos(phase * 2 * Math.PI);  // -1 to 1
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, r * Math.abs(ex), r, 0, -Math.PI/2, Math.PI/2, ex < 0);
+    ctx.fill();
+  } else {
+    // Waning: dark on right half + ellipse on left
+    ctx.beginPath();
+    ctx.arc(sx, sy, r, -Math.PI/2, Math.PI/2, true); // right half
+    ctx.fill();
+    const ex = Math.cos(phase * 2 * Math.PI);
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, r * Math.abs(ex), r, 0, Math.PI/2, -Math.PI/2, ex > 0);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Glow
+  const glow = ctx.createRadialGradient(sx, sy, r*0.8, sx, sy, r*3.5);
+  glow.addColorStop(0, `rgba(240,235,210,0.15)`);
+  glow.addColorStop(1, 'transparent');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(sx, sy, r*3.5, 0, Math.PI*2);
+  ctx.fill();
+
+  // Label
+  if (flags.lbl) {
+    ctx.fillStyle = 'rgba(240,230,200,0.7)';
+    ctx.font = '9px Space Mono';
+    ctx.textAlign = 'left';
+    ctx.fillText('Moon', sx + r + 5, sy + 4);
+  }
+}
+
+function drawPlanet(sx, sy, name, col, isSaturn) {
+  const r = name === 'Jupiter' ? Math.max(3, H/260) :
+            name === 'Venus'   ? Math.max(2.5, H/300) :
+            Math.max(2, H/350);
+
+  // Glow
+  const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, r*4);
+  glow.addColorStop(0, col.replace(')',',0.25)').replace('rgb','rgba'));
+  glow.addColorStop(1, 'transparent');
+  // Parse hex col to rgba
+  const hx = col.replace('#','');
+  const pr = parseInt(hx.substring(0,2),16);
+  const pg = parseInt(hx.substring(2,4),16);
+  const pb = parseInt(hx.substring(4,6),16);
+  const glw = ctx.createRadialGradient(sx, sy, 0, sx, sy, r*5);
+  glw.addColorStop(0, `rgba(${pr},${pg},${pb},0.2)`);
+  glw.addColorStop(1, 'transparent');
+  ctx.fillStyle = glw;
+  ctx.beginPath(); ctx.arc(sx, sy, r*5, 0, Math.PI*2); ctx.fill();
+
+  // Disk
+  ctx.beginPath();
+  ctx.arc(sx, sy, r, 0, Math.PI*2);
+  ctx.fillStyle = col;
+  ctx.fill();
+
+  // Saturn rings
+  if (isSaturn) {
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.scale(1, 0.3);
+    ctx.beginPath();
+    ctx.arc(0, 0, r*2.4, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(210,190,140,0.6)';
+    ctx.lineWidth = r*0.7;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Label
+  if (flags.lbl) {
+    ctx.fillStyle = `rgba(${pr},${pg},${pb},0.75)`;
+    ctx.font = '9px Space Mono';
+    ctx.textAlign = 'left';
+    ctx.fillText(name, sx + r + 5, sy + 4);
+  }
+}
+
+function drawSolarSystem() {
+  // Moon
+  const moon = moonPosition(simTime);
+  const me = raDecToENU(moon.ra, moon.dec, lat, lon, simTime);
+  if (me.altDeg > 0) {
+    const ms = enuToScreen(me.x, me.y, me.z, W, H);
+    if (ms && ms.sx > -20 && ms.sx < W+20 && ms.sy > -20 && ms.sy < H+20) {
+      drawMoon(ms.sx, ms.sy, moon.phase);
+      cached.push({ name:'Moon', con:'Natural Satellite', mag:-12.7,
+        sx:ms.sx, sy:ms.sy, altDeg:me.altDeg, azDeg:me.azDeg });
+    }
+  }
+
+  // Planets
+  for (const p of PLANET_ELEMS) {
+    const pos = planetPosition(p, simTime);
+    const pe = raDecToENU(pos.ra, pos.dec, lat, lon, simTime);
+    if (pe.altDeg <= 0) continue;
+    const ps = enuToScreen(pe.x, pe.y, pe.z, W, H);
+    if (!ps || ps.sx < -20 || ps.sx > W+20 || ps.sy < -20 || ps.sy > H+20) continue;
+    drawPlanet(ps.sx, ps.sy, p.name, p.col, p.name === 'Saturn');
+    cached.push({ name:p.name, con:'Planet', mag:p.magB,
+      sx:ps.sx, sy:ps.sy, altDeg:pe.altDeg, azDeg:pe.azDeg });
+  }
+}
+
+// ════════════════════════════════════════════════
+// STARS
+// ════════════════════════════════════════════════
+// Realistic star colors: most are white/blue-white.
+// BV < 0.6 → bluish-white, BV 0.6-1.0 → white-yellow, BV > 1.0 → orange/red
+// We bias heavily toward white.
+function bvToColor(bv) {
+  bv = clamp(bv, -0.4, 2.0);
+  // Desaturate heavily — real stars look nearly white to the eye
+  let r,g,b;
+  if      (bv < 0.0)  { r=0.70; g=0.80; b=1.00; }  // blue-white O/B
+  else if (bv < 0.3)  { r=0.85; g=0.90; b=1.00; }  // white A
+  else if (bv < 0.6)  { r=0.95; g=0.97; b=1.00; }  // yellow-white F
+  else if (bv < 0.8)  { r=1.00; g=0.97; b=0.90; }  // yellow G
+  else if (bv < 1.2)  { r=1.00; g=0.88; b=0.72; }  // orange K
+  else                { r=1.00; g=0.72; b=0.50; }  // red M
+  // Strong desaturation toward white
+  const sat = 0.35; // only 35% saturation
+  return [
+    r*sat + (1-sat),
+    g*sat + (1-sat),
+    b*sat + (1-sat)
+  ];
+}
+
+const NAMED = [
+  [101.287,-16.716,-1.46, 0.00,"Sirius","Canis Major"],
+  [95.988,-52.696,-0.74,  0.16,"Canopus","Carina"],
+  [219.902,-60.834,-0.27, 0.71,"Rigil Kent.","Centaurus"],
+  [213.915,19.182, -0.05, 1.23,"Arcturus","Boötes"],
+  [279.234,38.783,  0.03, 0.22,"Vega","Lyra"],
+  [81.283, -8.202,  0.18,-0.03,"Rigel","Orion"],
+  [114.826, 5.228,  0.34, 0.80,"Procyon","Canis Minor"],
+  [297.696, 8.868,  0.77, 0.22,"Altair","Aquila"],
+  [310.358,45.280,  1.25, 0.09,"Deneb","Cygnus"],
+  [88.793,  7.407,  0.50, 1.50,"Betelgeuse","Orion"],
+  [68.980, 16.510,  0.87, 1.54,"Aldebaran","Taurus"],
+  [152.093,11.967,  1.35, 1.00,"Regulus","Leo"],
+  [83.822, -5.910,  1.64, 0.15,"Bellatrix","Orion"],
+  [84.053, -1.202,  2.23, 0.13,"Mintaka","Orion"],
+  [84.411, -1.943,  1.70, 0.13,"Alnilam","Orion"],
+  [85.190, -2.600,  1.77, 0.17,"Alnitak","Orion"],
+  [78.634, -8.202,  2.07, 0.09,"Saiph","Orion"],
+  [255.980,-26.432, 0.96, 1.83,"Antares","Scorpius"],
+  [265.622,-37.103, 1.62, 0.40,"Shaula","Scorpius"],
+  [37.954, 89.264,  1.97, 0.60,"Polaris","Ursa Minor"],
+  [166.460,56.383,  1.79, 1.28,"Dubhe","Ursa Major"],
+  [165.460,56.383,  2.36, 0.03,"Merak","Ursa Major"],
+  [183.856,57.033,  1.76, 0.03,"Alioth","Ursa Major"],
+  [200.981,54.925,  2.23, 1.00,"Mizar","Ursa Major"],
+  [206.885,49.313,  1.85, 1.52,"Alkaid","Ursa Major"],
+  [113.649,31.889,  1.58, 0.03,"Castor","Gemini"],
+  [116.329,28.026,  1.14, 1.00,"Pollux","Gemini"],
+  [69.454, 32.288,  1.65, 0.09,"Elnath","Taurus"],
+  [177.265,-63.099, 0.77, 0.17,"Acrux","Crux"],
+  [186.650,-63.099, 1.25,-0.24,"Mimosa","Crux"],
+  [191.930,-59.689, 1.64, 1.60,"Gacrux","Crux"],
+  [206.885,-60.373, 0.61,-0.23,"Hadar","Centaurus"],
+  [344.413,-29.622, 1.17, 0.09,"Fomalhaut","Piscis Aus."],
+  [177.675,14.572,  2.14, 0.09,"Denebola","Leo"],
+  [10.897, 56.537,  1.79, 0.48,"Mirfak","Perseus"],
+  [24.429,-57.237,  0.50,-0.16,"Achernar","Eridanus"],
+  [247.352,-26.113, 1.06, 1.17,"Dschubba","Scorpius"],
+];
+
+function rng32(seed) {
+  return () => {
+    seed |= 0; seed = seed+0x6D2B79F5|0;
+    let t = Math.imul(seed^seed>>>15, 1|seed);
+    t = t+Math.imul(t^t>>>7, 61|t)^t;
+    return ((t^t>>>14)>>>0)/4294967296;
+  };
+}
+
+function buildStars() {
+  const seen = new Set();
+  const all = [];
+  for (const s of NAMED) {
+    if (seen.has(s[4])) continue;
+    seen.add(s[4]);
+    all.push({ ra:s[0], dec:s[1], mag:s[2], bv:s[3], name:s[4], con:s[5] });
+  }
+  const r = rng32(42);
+  for (let i = 0; i < 18000; i++) {
+    const ra  = r()*360;
+    const dec = Math.asin(r()*2-1)*R2D;
+    // Milky Way concentration
+    const galLat = dec - 29*Math.sin((ra-270)*D2R)*Math.cos(dec*D2R);
+    const mw = Math.exp(-galLat*galLat/180);
+    if (r() > 0.18 + 0.82*mw) continue;
+    const mag = 2.0 + r()*4.5;
+    const bv  = r()*2.0 - 0.3;
+    all.push({ ra, dec, mag, bv, name:null });
+  }
+  // Give every star a unique twinkle phase & frequency so they don't pulse in sync
+  const tr = rng32(99);
+  for (const s of all) {
+    s.twPhase = tr() * Math.PI * 2;
+    s.twFreq  = 0.6 + tr() * 1.2;   // cycles per second, 0.6–1.8 Hz
+  }
+  return all;
+}
+
+// ════════════════════════════════════════════════
+// CAMERA STATE  (first-person spherical)
+// yaw   = rotation around Up axis (azimuth, 0=North, clockwise)
+// pitch = elevation angle (-90 to +90)
+// fov   = vertical field of view in degrees
+// ════════════════════════════════════════════════
+let yaw   = 180;   // looking South by default
+let pitch = 20;    // slightly elevated
+let fov   = 70;
+
+// Convert ENU vector to screen XY given current camera orientation
+// Returns null if behind camera
+function enuToScreen(ex, ey, ez, W, H) {
+  // Camera forward vector in ENU
+  const yr = yaw*D2R, pr = pitch*D2R;
+  const fx =  Math.sin(yr)*Math.cos(pr);
+  const fy =  Math.cos(yr)*Math.cos(pr);
+  const fz =  Math.sin(pr);
+  // Right vector (East cross Up-ish)
+  const rx =  Math.cos(yr);
+  const ry = -Math.sin(yr);
+  const rz =  0;
+  // Up vector = forward cross right  (normalized)
+  const ux = fz*ry - fy*rz;  // = -sin(yr)*sin(pr)... let's compute properly
+  const uy = fx*rz - fz*rx;  // = -cos(yr)*sin(pr)
+  const uz = fy*rx - fx*ry;  // = cos(pr)
+
+  // Dot with camera axes
+  const dot_f = ex*fx + ey*fy + ez*fz;
+  if (dot_f <= 0.001) return null;  // behind
+
+  const dot_r = ex*rx + ey*ry + ez*rz;
+  const dot_u = ex*ux + ey*uy + ez*uz;
+
+  // Perspective projection
+  const scale = (H/2) / Math.tan(fov/2*D2R);
+  const sx = W/2 + (dot_r/dot_f)*scale;
+  const sy = H/2 - (dot_u/dot_f)*scale;
+
+  return { sx, sy, depth: dot_f };
+}
+
+// ════════════════════════════════════════════════
+// CANVAS
+// ════════════════════════════════════════════════
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+resize();
+window.addEventListener('resize', resize);
+
+// ════════════════════════════════════════════════
+// SIM STATE
+// ════════════════════════════════════════════════
+let lat = 40.7, lon = -74.0;
+let simTime = new Date();
+let lastRT  = Date.now();
+let tMult   = 1, paused = false;
+let travelKms = 0, travelDir = 'N';
+const flags = { mw:true, lbl:true, grid:false, atm:true };
+
+let stars  = [];
+let cached = [];   // computed this frame: {x,y,s} for tooltip
+
+// Milky Way spine
+const MW_SPINE = [];
+for (let i = 0; i <= 360; i += 2) {
+  const gl = i*D2R;
+  const ra  = ((-Math.atan2(-Math.sin(gl)*Math.cos(27.128*D2R), Math.cos(gl))*R2D) + 266.405 + 360) % 360;
+  const dec = Math.asin(Math.sin(gl)*Math.sin(27.128*D2R))*R2D;
+  MW_SPINE.push({ ra, dec });
+}
+
+// ════════════════════════════════════════════════
+// DRAWING
+// ════════════════════════════════════════════════
+function drawSky() {
+  // Night sky gradient centered on where camera is looking
+  const atm = flags.atm;
+  if (atm) {
+    // Deeper black overhead, very subtle deep blue tint
+    const bg = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W,H)*0.7);
+    bg.addColorStop(0,   '#01020d');
+    bg.addColorStop(1,   '#010208');
+    ctx.fillStyle = bg;
+  } else {
+    ctx.fillStyle = '#000';
+  }
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawGround() {
+  // Find the screen-space horizon line and fill below with ground
+  // Horizon is where pitch == 0 in our view
+  // The pitch of a screen pixel y: pitch_px = pitch - (H/2-y)*(fov/H)
+  // horizon at y: (H/2 - y)*(fov/H) = pitch  =>  y = H/2 - pitch*(H/fov)
+  const scale = H / fov;
+  const horizonY = H/2 + pitch*scale;
+
+  if (horizonY < H) {
+    // Ground fill
+    const gy = Math.max(0, horizonY);
+    const grd = ctx.createLinearGradient(0, gy, 0, H);
+    if (flags.atm) {
+      grd.addColorStop(0, 'rgba(15,35,15,0.97)');
+      grd.addColorStop(1, 'rgba(8,20,8,1)');
+    } else {
+      grd.addColorStop(0, '#0a1a0a');
+      grd.addColorStop(1, '#050e05');
+    }
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, gy, W, H - gy);
+
+    // Subtle horizon glow
+    if (flags.atm && horizonY > 0 && horizonY < H) {
+      const hgrd = ctx.createLinearGradient(0, Math.max(0,horizonY-40), 0, Math.min(H,horizonY+30));
+      hgrd.addColorStop(0, 'rgba(30,80,50,0)');
+      hgrd.addColorStop(0.5, 'rgba(30,70,40,0.12)');
+      hgrd.addColorStop(1, 'rgba(10,30,15,0)');
+      ctx.fillStyle = hgrd;
+      ctx.fillRect(0, Math.max(0,horizonY-40), W, 70);
+    }
+
+    // Horizon line
+    if (horizonY >= 0 && horizonY <= H) {
+      ctx.strokeStyle = 'rgba(60,120,60,0.25)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 10]);
+      ctx.beginPath();
+      ctx.moveTo(0, horizonY);
+      ctx.lineTo(W, horizonY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+}
+
+function drawMilkyWay() {
+  if (!flags.mw) return;
+  const pts = MW_SPINE.map(p => {
+    const e = raDecToENU(p.ra, p.dec, lat, lon, simTime);
+    if (e.altDeg < -10) return null;
+    const s = enuToScreen(e.x, e.y, e.z, W, H);
+    return s ? { sx: s.sx, sy: s.sy } : null;
+  });
+
+  for (let w = 28; w >= 3; w -= 5) {
+    ctx.beginPath();
+    let started = false;
+    for (const p of pts) {
+      if (!p) { started = false; continue; }
+      if (!started) { ctx.moveTo(p.sx, p.sy); started = true; }
+      else ctx.lineTo(p.sx, p.sy);
+    }
+    const a = 0.009 + (28-w)*0.003;
+    ctx.strokeStyle = `rgba(160,185,255,${a})`;
+    ctx.lineWidth = w * (H/800);
+    ctx.stroke();
+  }
+}
+
+function drawGrid() {
+  if (!flags.grid) return;
+  ctx.setLineDash([2,8]);
+  ctx.lineWidth = 0.5;
+  ctx.strokeStyle = 'rgba(60,100,180,0.15)';
+  // Altitude circles
+  for (let a = -30; a <= 80; a += 20) {
+    ctx.beginPath(); let first = true;
+    for (let az = 0; az <= 360; az += 3) {
+      const aR = a*D2R, azR = az*D2R;
+      const ex = Math.cos(aR)*Math.sin(azR);
+      const ey = Math.cos(aR)*Math.cos(azR);
+      const ez = Math.sin(aR);
+      const s = enuToScreen(ex,ey,ez,W,H);
+      if (!s) { first=true; continue; }
+      if (first) { ctx.moveTo(s.sx,s.sy); first=false; } else ctx.lineTo(s.sx,s.sy);
+    }
+    ctx.stroke();
+  }
+  // Azimuth lines
+  for (let az = 0; az < 360; az += 30) {
+    ctx.beginPath(); let first = true;
+    for (let a = -30; a <= 90; a += 5) {
+      const aR = a*D2R, azR = az*D2R;
+      const ex = Math.cos(aR)*Math.sin(azR);
+      const ey = Math.cos(aR)*Math.cos(azR);
+      const ez = Math.sin(aR);
+      const s = enuToScreen(ex,ey,ez,W,H);
+      if (!s) { first=true; continue; }
+      if (first) { ctx.moveTo(s.sx,s.sy); first=false; } else ctx.lineTo(s.sx,s.sy);
+    }
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+}
+
+function drawCardinals() {
+  const cards = [['N',0],['NE',45],['E',90],['SE',135],['S',180],['SW',225],['W',270],['NW',315]];
+  for (const [lbl,az] of cards) {
+    const azR = az*D2R;
+    const ex = Math.cos(0)*Math.sin(azR);
+    const ey = Math.cos(0)*Math.cos(azR);
+    const s = enuToScreen(ex, ey, 0.001, W, H);
+    if (!s) continue;
+    if (s.sx < -20 || s.sx > W+20 || s.sy < -20 || s.sy > H+20) continue;
+    ctx.fillStyle = lbl.length===1 ? 'rgba(100,200,120,0.6)' : 'rgba(100,200,120,0.3)';
+    ctx.font = lbl.length===1 ? 'bold 11px Space Mono' : '8px Space Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText(lbl, s.sx, s.sy - 6);
+  }
+}
+
+function drawStars() {
+  cached = [];
+  let cnt = 0;
+
+  for (const star of stars) {
+    const e = raDecToENU(star.ra, star.dec, lat, lon, simTime);
+    if (e.altDeg < 0) continue;
+
+    const s = enuToScreen(e.x, e.y, e.z, W, H);
+    if (!s) continue;
+    if (s.sx < -10 || s.sx > W+10 || s.sy < -10 || s.sy > H+10) continue;
+
+    const mag = star.mag;
+
+    // Twinkle — super subtle shimmer in brightness and size
+    // Stars near the horizon twinkle more (atmospheric scintillation)
+    const altFactor = clamp(1.0 - e.altDeg / 60, 0, 1);
+    const twAmt = 0.04 + altFactor * 0.05;  // 4-9% max variation
+    const twTime = performance.now() / 1000;
+    const tw = Math.sin(twTime * (star.twFreq||1) * Math.PI * 2 + (star.twPhase||0)) * twAmt;
+
+    const baseSize = clamp((4.5 - mag) * 0.5, 0.2, 3.0);
+    const sz = baseSize * Math.sqrt(H/900) * (1 + tw * 0.5);
+
+    // Opacity: faint stars barely visible, bright stars solid
+    const alpha = clamp((6.0 - mag) / 5.5 + tw, 0.07, 1.0);
+
+    const [r,g,b] = bvToColor(star.bv);
+    const rs = Math.round(r*255), gs = Math.round(g*255), bs = Math.round(b*255);
+
+    // Only very bright stars (mag < 1) get a soft glow
+    if (mag < 1.2 && sz > 1.2) {
+      const glowR = sz * 4.5;
+      const glow = ctx.createRadialGradient(s.sx, s.sy, 0, s.sx, s.sy, glowR);
+      glow.addColorStop(0, `rgba(${rs},${gs},${bs},${alpha*0.18})`);
+      glow.addColorStop(0.4, `rgba(${rs},${gs},${bs},${alpha*0.06})`);
+      glow.addColorStop(1, 'transparent');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(s.sx, s.sy, glowR, 0, Math.PI*2);
+      ctx.fill();
+    }
+    // Tiny hard glow for mag 1-2.5
+    if (mag < 2.5 && sz > 0.8) {
+      const miniGlow = ctx.createRadialGradient(s.sx, s.sy, 0, s.sx, s.sy, sz*2.5);
+      miniGlow.addColorStop(0, `rgba(${rs},${gs},${bs},${alpha*0.3})`);
+      miniGlow.addColorStop(1, 'transparent');
+      ctx.fillStyle = miniGlow;
+      ctx.beginPath();
+      ctx.arc(s.sx, s.sy, sz*2.5, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // Star point — solid circle for bright, single pixel for faint
+    ctx.fillStyle = `rgba(${rs},${gs},${bs},${alpha})`;
+    if (sz < 0.6) {
+      // Sub-pixel: draw as a 1×1 rect for speed and realism
+      ctx.fillRect(Math.round(s.sx), Math.round(s.sy), 1, 1);
+    } else {
+      ctx.beginPath();
+      ctx.arc(s.sx, s.sy, sz, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // Label
+    if (flags.lbl && star.name && mag < 2.0) {
+      ctx.fillStyle = `rgba(190,215,255,${alpha*0.6})`;
+      ctx.font = '9px Space Mono';
+      ctx.textAlign = 'left';
+      ctx.fillText(star.name, s.sx + sz + 4, s.sy + 4);
+    }
+
+    if (star.name) cached.push({ ...star, sx: s.sx, sy: s.sy, altDeg: e.altDeg, azDeg: e.azDeg });
+    cnt++;
+  }
+  document.getElementById('viscnt').textContent = cnt + ' stars';
+}
+
+function render() {
+  drawSky();
+  drawMilkyWay();
+  drawGrid();
+  drawCardinals();
+  drawStars();
+  drawSolarSystem();
+  drawGround();  // drawn last — covers anything below horizon
+}
+
+// ════════════════════════════════════════════════
+// SIMULATION LOOP
+// ════════════════════════════════════════════════
+let fc = 0;
+function tick() {
+  const now = Date.now();
+  const rdt = (now - lastRT) / 1000;
+  lastRT = now;
+
+  if (!paused) {
+    simTime = new Date(simTime.getTime() + rdt * tMult * 1000);
+
+    if (travelKms > 0) {
+      const degPerSec = travelKms * (180 / (Math.PI * 6371));
+      const effective = degPerSec * rdt * Math.max(1, tMult / 60);
+      if (travelDir==='N') lat = clamp(lat+effective, -89.9, 89.9);
+      else if (travelDir==='S') lat = clamp(lat-effective, -89.9, 89.9);
+      else if (travelDir==='E') { lon = (lon+effective+360)%360; if(lon>180) lon-=360; }
+      else if (travelDir==='W') { lon = (lon-effective+360)%360; if(lon>180) lon-=360; }
+      syncLocUI();
+    }
+  }
+
+  if (fc % 2 === 0) updateHUD();
+  render();
+  fc++;
+  requestAnimationFrame(tick);
+}
+
+function updateHUD() {
+  const d = simTime;
+  const p = n => String(n).padStart(2,'0');
+  document.getElementById('dv').textContent = `${d.getUTCFullYear()}-${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())}`;
+  document.getElementById('tv').textContent = `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
+  document.getElementById('latv').textContent = `${Math.abs(lat).toFixed(2)}° ${lat>=0?'N':'S'}`;
+  document.getElementById('lonv').textContent = `${Math.abs(lon).toFixed(2)}° ${lon>=0?'E':'W'}`;
+  document.getElementById('pitchv').textContent = pitch.toFixed(1)+'°';
+  document.getElementById('yawv').textContent = yaw.toFixed(1)+'°';
+}
+
+function syncLocUI() {
+  document.getElementById('slat').value = lat;
+  document.getElementById('slon').value = lon;
+  document.getElementById('rlat').textContent = `${Math.abs(lat).toFixed(1)}° ${lat>=0?'N':'S'}`;
+  document.getElementById('rlon').textContent = `${Math.abs(lon).toFixed(1)}° ${lon>=0?'E':'W'}`;
+}
+
+// ════════════════════════════════════════════════
+// INPUT — drag to rotate view
+// ════════════════════════════════════════════════
+let dragging = false, dX = 0, dY = 0, dYaw = 0, dPitch = 0;
+
+canvas.addEventListener('mousedown', e => {
+  dragging = true;
+  dX = e.clientX; dY = e.clientY;
+  dYaw = yaw; dPitch = pitch;
+  canvas.classList.add('dragging');
+});
+window.addEventListener('mousemove', e => {
+  if (dragging) {
+    // Sensitivity: pixels per degree, adjusted by fov
+    const sens = fov / 700;
+    yaw   = ((dYaw   - (e.clientX - dX) * sens) % 360 + 360) % 360;
+    pitch =   clamp(dPitch + (e.clientY - dY) * sens, -89, 89);
+  }
+  // Tooltip
+  let best = null, bd = 22;
+  for (const s of cached) {
+    const dx = s.sx - e.clientX, dy = s.sy - e.clientY;
+    const dd = Math.sqrt(dx*dx + dy*dy);
+    if (dd < bd) { bd = dd; best = s; }
+  }
+  const tip = document.getElementById('tip');
+  if (best) {
+    tip.style.display = 'block';
+    tip.style.left = (e.clientX + 14) + 'px';
+    tip.style.top  = (e.clientY - 12) + 'px';
+    document.getElementById('tipname').textContent = best.name;
+    document.getElementById('tipinfo').innerHTML =
+      `${best.con}<br>Mag ${best.mag.toFixed(2)} · Alt ${best.altDeg.toFixed(1)}° · Az ${best.azDeg.toFixed(1)}°`;
+  } else {
+    tip.style.display = 'none';
+  }
+});
+window.addEventListener('mouseup', () => { dragging = false; canvas.classList.remove('dragging'); });
+
+canvas.addEventListener('wheel', e => {
+  fov = clamp(fov * (e.deltaY > 0 ? 1.08 : 0.93), 15, 120);
+  e.preventDefault();
+}, { passive: false });
+
+// Touch
+let tx = 0, ty = 0, tYaw = 0, tPitch = 0;
+canvas.addEventListener('touchstart', e => { tx=e.touches[0].clientX; ty=e.touches[0].clientY; tYaw=yaw; tPitch=pitch; });
+canvas.addEventListener('touchmove', e => {
+  const sens = fov / 700;
+  yaw   = ((tYaw   - (e.touches[0].clientX - tx) * sens) % 360 + 360) % 360;
+  pitch =   clamp(tPitch + (e.touches[0].clientY - ty) * sens, -89, 89);
+  e.preventDefault();
+}, { passive: false });
+
+// ════════════════════════════════════════════════
+// CONTROLS
+// ════════════════════════════════════════════════
+const TS_V = [1,10,30,60,300,600,1800,3600,7200,21600,86400,864000];
+const TS_L = ['1×','10×','30×','60×','5m/s','10m/s','30m/s','1hr/s','2hr/s','6hr/s','1day/s','10day/s'];
+const TS_U = ['REAL TIME','FAST','FAST','FAST FWD','WARP','WARP','WARP','WARP','WARP','WARP','WARP','EXTREME'];
+
+function setTS(i) {
+  i = clamp(i, 0, 11);
+  tMult = TS_V[i];
+  document.getElementById('stspd').value = i;
+  document.getElementById('rspeedlbl').textContent  = TS_L[i];
+  document.getElementById('rspeedunit').textContent = TS_U[i];
+  ['ts0','ts3','ts7','ts10'].forEach((id,j) => {
+    document.getElementById(id).classList.toggle('on', [0,3,7,10][j]===i);
+  });
+}
+
+function togglePause() {
+  paused = !paused; lastRT = Date.now();
+  const b = document.getElementById('pausebtn');
+  b.textContent = paused ? '▶ Resume' : '⏸ Pause';
+  b.classList.toggle('on', paused);
+}
+function resetTime() { simTime = new Date(); lastRT = Date.now(); }
+
+function goTo(la, lo) {
+  lat = la; lon = lo; syncLocUI();
+}
+
+function setDir(d) {
+  travelDir = d;
+  ['N','E','S','W'].forEach(x => document.getElementById('d'+x).classList.toggle('on', x===d));
+  if (travelKms > 0) document.getElementById('tblabel').textContent = `TRAVELING ${d}  ${travelKms} km/s`;
+}
+
+function tog(k) {
+  flags[k] = !flags[k];
+  const b = document.getElementById('b'+k);
+  if (b) b.classList.toggle('on', flags[k]);
+}
+
+document.getElementById('slat').addEventListener('input', e => {
+  lat = parseFloat(e.target.value);
+  document.getElementById('rlat').textContent = `${Math.abs(lat).toFixed(1)}° ${lat>=0?'N':'S'}`;
+});
+document.getElementById('slon').addEventListener('input', e => {
+  lon = parseFloat(e.target.value);
+  document.getElementById('rlon').textContent = `${Math.abs(lon).toFixed(1)}° ${lon>=0?'E':'W'}`;
+});
+document.getElementById('stspd').addEventListener('input', e => setTS(parseInt(e.target.value)));
+document.getElementById('sspd').addEventListener('input', e => {
+  travelKms = parseFloat(e.target.value);
+  document.getElementById('rspd').textContent = travelKms===0 ? 'Stationary' : `${travelKms} km/s`;
+  const tb = document.getElementById('travelbadge');
+  tb.classList.toggle('on', travelKms > 0);
+  document.getElementById('tblabel').textContent = `TRAVELING ${travelDir}  ${travelKms} km/s`;
+});
+
+// ════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════
+function init() {
+  stars = buildStars();
+  setDir('N');
+  setTS(0);
+  lastRT = Date.now();
+  setTimeout(() => {
+    const ld = document.getElementById('loading');
+    ld.style.opacity = '0';
+    setTimeout(() => ld.remove(), 750);
+  }, 500);
+  tick();
+}
+init();
+</script>
+</body>
+</html>
